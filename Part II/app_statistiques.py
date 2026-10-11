@@ -78,6 +78,20 @@ def ca_mois(mois):
     with verrou:
         return jsonify({"mois": mois, "chiffre_affaires": round(ca_par_mois.get(mois, 0.0), 2)})
 
+@app.route("/statistiques", methods=["GET"])
+def statistiques_generales():
+    with verrou:
+        nb_total = sum(nb_par_produit.values())
+        ca_total = sum(ca_par_mois.values())
+        top = max(nb_par_produit, key=nb_par_produit.get) if nb_par_produit else None
+        return jsonify({
+            "nb_commandes_total": nb_total,
+            "chiffre_affaires_total": round(ca_total, 2),
+            "panier_moyen": round(ca_total / nb_total, 2) if nb_total else 0.0,
+            "produit_le_plus_commande": top,
+            "commandes_par_produit": dict(nb_par_produit),
+            "ca_par_mois": {m: round(v, 2) for m, v in ca_par_mois.items()},
+        })
 
 if __name__ == "__main__":
     threading.Thread(target=consommer, daemon=True).start()
