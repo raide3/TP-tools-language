@@ -1,0 +1,81 @@
+# ===== PART I : PROJET API REST =====
+
+# API Clients et Commandes (avant dockerisation)
+curl http://localhost:8080/clients                  # texte + capture
+http://localhost:8080/clients                       # navigateur
+curl http://localhost:8080/clients/1                # texte + capture
+http://localhost:8080/clients/1                     # navigateur (capture)
+curl http://localhost:8081/commandes                # texte + capture
+http://localhost:8081/commandes                     # navigateur (capture)
+http://localhost:8081/commandes/2                   # navigateur (texte + capture)
+
+# Dockerisation des clients
+docker build -t microservice-clients ./clients                    # texte + capture
+docker run -p 8080:8080 --name clients microservice-clients       # texte + capture
+docker rm clients                                                 # texte (si le conteneur existe déjà)
+curl http://localhost:8080/clients                                # texte (test)
+
+# Dockerisation des commandes
+docker build -t microservice-commandes ./commandes                # texte + capture
+docker rm commandes                                               # texte + capture
+docker run -p 8081:8081 --name commandes microservice-commandes   # texte + capture
+curl http://localhost:8081/commandes                              # texte (test)
+
+# Gestion des erreurs
+curl http://localhost:8080/clients/100              # texte + capture
+http://localhost:8080/clients/100                   # navigateur (capture)
+curl http://localhost:8081/commandes/100            # texte + capture
+
+# Conteneurs en fonctionnement
+docker ps                                           # capture (clients + commandes)
+docker ps                                           # 2e capture (clients_docker + commandes_docker)
+
+
+# ===== PART II : PROJET KAFKA =====
+
+docker ps -a                                        # texte
+docker start kafka                                  # texte
+docker ps                                           # capture
+
+docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh --topic commandes-creees --from-beginning --bootstrap-server localhost:9092   # texte
+docker exec -it kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092   # capture (affiche l'aide)
+
+# Création d'une commande
+Invoke-RestMethod -Method Post -Uri http://localhost:5002/commandes -ContentType "application/json" -Body '{"client_id":3,"produit":"PC","montant":900,"date_commande":"2026-10-05T16:45:00"}'   # texte + capture
+
+# Test de Kafka
+docker logs kafka --tail 10                                                                                              # capture
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list                                # capture
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic commandes-creees   # capture
+docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic commandes-creees --from-beginning   # capture
+docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh `
+    --topic commandes-creees `
+    --from-beginning `
+    --bootstrap-server localhost:9092                                                                                    # capture
+
+http://localhost:5002/commandes                     # navigateur (texte + capture)
+http://localhost:5001/clients/commandes             # navigateur (texte + capture)
+
+# Arrêter un micro-service
+docker exec -it kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group clients-group   # capture (lags à 1)
+python "C:\Users\audes\PycharmProjects\PythonProject1\Part II\app_clients.py"                                                     # capture (relance de app_clients)
+docker exec -it kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group clients-group   # capture (lags à 0)
+
+# 1.7 Ajouter un deuxième consommateur
+docker exec -it kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group statistiques-group   # capture
+docker exec -it kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group clients-group        # capture
+
+# Statistiques
+Invoke-RestMethod http://localhost:5003/statistiques/ca                   # capture
+# Chiffre d'affaires d'un mois (format AAAA-MM)                           # capture
+Invoke-RestMethod http://localhost:5003/statistiques/ca/2026-10           # capture
+Invoke-RestMethod http://localhost:5003/statistiques/produits             # capture (commentaire : # commandes par produit)
+Invoke-RestMethod http://localhost:5003/statistiques/produits/pc          # capture
+
+# 8. Kafka et groupes consommateurs
+python consumer_groupe.py groupe-A A1               # capture
+python consumer_groupe.py groupe-A A2               # 2 captures
+python consumer_groupe.py clients-test C1           # capture
+python consumer_groupe.py statistiques-test S1      # capture
+docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic commandes-creees --from-beginning --property print.offset=true   # capture
+docker exec -it kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list                                                                  # capture
